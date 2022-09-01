@@ -1,5 +1,5 @@
 # Learning to Predict Requires Integrated Information
-The code corresponding to the article "Learning to Predict requires Integrated Information" (linkt coming soon). 
+This is the code and data corresponding to the article "Learning to Predict requires Integrated Information" (link coming soon). 
 There we analyze the behavior of the Integrated Information measure, while the agents learn to predict and navigate their environment. The movement
 of the agents is demonstrated in the video below. If their body touches a wall they are stuck, as long as at least one of the sensors is still detecting a wall.
 
