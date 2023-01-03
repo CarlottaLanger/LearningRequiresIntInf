@@ -478,7 +478,7 @@ if anim == True:
     #main()
 else:
     start_time = time.time()
-   # global path
+   # writing the solutions to a file
     output = open(path, 'a')
     output.write("import numpy as np")
     output.write('\n')
