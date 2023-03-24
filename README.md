@@ -20,7 +20,7 @@ The code requires a python version 3 and it was tested on python 3.8 with the fo
 3. scipy 1.10.1 
 4. descartes 1.1.0. 
 
-#Output
+# Results
 
 The program saves for every 100th step the measures in the file with the path given in line 67 of the main.py. 
 There we have in that order:
