@@ -56,8 +56,6 @@ anim = True
 #0: no integrated information, 1: no integrated information in the beginning, 2: fully connected agents
 integratedinformation = 2
 sample = False
-#global iteration
-#iteration = 0
 global path
 
 #sensor length
@@ -66,11 +64,10 @@ bodySize = 0.55 #0.3
 
 
 
-path = 's'+ str(integratedinformation)+'measures'+ str(sens_length).replace('.','')+'.py'
+path = 'results'+ str(integratedinformation)+'measures'+ str(sens_length).replace('.','')+'.py'
 global sensors
 sensors = [
     rotate_origin(sg.LineString([(0,bodySize),(0, bodySize+sens_length)]),-0.1*tau),
-   # sg.LineString([(0,bodySize),(0,3)]),
     rotate_origin(sg.LineString([(0,bodySize),(0,bodySize+sens_length)]),0.1*tau),
 ]
 
@@ -82,10 +79,9 @@ def increaseSensorSize(incr):
     global sensors
     sensors = [
         rotate_origin(sg.LineString([(0, bodySize), (0, bodySize+incr)]), -0.1 * tau),
-        # sg.LineString([(0,bodySizey),(0,3)]),
         rotate_origin(sg.LineString([(0, bodySize), (0, bodySize+incr)]), 0.1 * tau),
     ]
-  #  #print("length", sensors[0].length)
+
 class AgentBody:
     # note: this class should only store what needs to be copied - everything
     # else (geometry etc.) should be generated on the fly
@@ -100,7 +96,6 @@ class AgentBody:
             if self.touchingWall(): # and sum(self.sensorValues(False))==0:
                 return self
     def touchingWall(self):
-      #  #print(arena.contains(self.pos) and (self.pos.distance(walls) > bodySize ))
         return arena.contains(self.pos) and (self.pos.distance(walls) > bodySize )
 
     def sensorValues(self,plot=True,plot_sensors=True):
@@ -171,7 +166,6 @@ class Controller:
         self.goal = np.array([0.5, 0.5])
         self.p_sca = np.zeros(2**(n_inputs+n_outputs+n_hidden)) + (1/ 2**(n_inputs+n_outputs+n_hidden))
         self.p_a = af.rand_cond_distr(2, n_hidden + n_inputs)
-        #self.p_c = af.rand_cond_distr2(2, n_hidden + n_inputs)
         self.p_s= np.ones(pow(2,n_inputs + n_inputs + n_outputs) ) / pow(2,n_inputs)
         self.p_s_pred= np.ones(pow(2,n_inputs + n_hidden + n_outputs) ) / pow(2,n_inputs)
         if integratedinformation == 1:
@@ -182,67 +176,61 @@ class Controller:
             self.p_c_i = af.rand_cond_distr2(2, 1 + n_inputs)
        # #print(self.p_s, np.sum(self.p_s))
 
-    # Em-algorithm to find the optimal policies and update the world model
+    # em-algorithm to find the optimal policies and update the world model
+    # here one could insert a different learning algorithm that updates the actuator, controller and prediction nodes
     def learn_policies(self, integratedinformation):
         #number of learning steps
-        l_steps = 15
+        l_steps = 5
 
-        p_c_red = np.zeros((2, pow(2,4)))
-        p_s_pred_joint = np.zeros(pow(2,9))
-        p_s_pred_joint_old = np.zeros(pow(2,9))
-        p_s_pred_red = np.zeros(pow(2,3))
+        p_c_red = np.zeros((2, pow(2, 4)))
+        p_s_pred_red = np.zeros(pow(2, 3))
         old_pred = np.copy(self.p_s_pred)
 
-        for i in range(pow(2,3)):
-            p_s_pred_red[i] = self.p_s_pred[self.last_c[0]*pow(2,6) + self.last_c[1]*pow(2,5)+ self.last_a[0]*pow(2,4) + self.last_a[1]*pow(2,3) + i]
+        for i in range(pow(2, 3)):
+            p_s_pred_red[i] = self.p_s_pred[
+                self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[
+                    1] * pow(2, 3) + i]
 
-        if integratedinformation ==0:
-            for i in range(pow(2,3)):
-                p_c_red[0][i] = self.p_c_i[0][self.last_c[1]*pow(2,4) + i]
-                p_c_red[1][i] = self.p_c_i[1][self.last_c[0]*pow(2,4)+ i]
+        if integratedinformation == 0:
+            for i in range(pow(2, 3)):
+                p_c_red[0][i] = self.p_c_i[0][self.last_c[1] * pow(2, 4) + i]
+                p_c_red[1][i] = self.p_c_i[1][self.last_c[0] * pow(2, 4) + i]
 
         else:
-            for i in range(pow(2,4)):
+            for i in range(pow(2, 4)):
                 for j in range(2):
-                    p_c_red[j][i] = self.p_c[j][self.last_c[0]*pow(2,5) + self.last_c[1]*pow(2,4) + i]
+                    p_c_red[j][i] = self.p_c[j][self.last_c[0] * pow(2, 5) + self.last_c[1] * pow(2, 4) + i]
 
-        ##print(p_c_red, np.sum(p_c_red))
         for i in range(l_steps):
             # policies
-            p1 = em.conditioning_pred_reduced(self.p_s_pred, p_c_red, self.p_a, p_s_pred_red )
+            p1 = em.conditioning_pred_reduced(self.p_s_pred, p_c_red, self.p_a, p_s_pred_red)
             p_c_red, self.p_a = em.factorizing_reduced(p1)
 
             # world model
-            p2 = em.conditioning_on_sensors_red(p_s_pred_red,p_c_red,self.p_a, self.p_s, self.p_s_pred)
+            p2 = em.conditioning_on_sensors_red(p_s_pred_red, p_c_red, self.p_a, self.p_s, self.p_s_pred)
             self.p_s_pred = em.factorizing_sensors(p2)
             for i in range(pow(2, 3)):
-                p_s_pred_red[i] = self.p_s_pred[self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[1] * pow(2, 3) + i]
+                p_s_pred_red[i] = self.p_s_pred[
+                    self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[
+                        1] * pow(2, 3) + i]
 
         if integratedinformation == 0:
-            for i in range(pow(2,3)):
-                self.p_c_i[0][int(self.last_c[0]*pow(2,4) +  i)] = p_c_red[0][i]
-                self.p_c_i[1][ int(self.last_c[1] * pow(2, 4) + i)] = p_c_red[1][i]
+            for i in range(pow(2, 3)):
+                self.p_c_i[0][int(self.last_c[0] * pow(2, 4) + i)] = p_c_red[0][i]
+                self.p_c_i[1][int(self.last_c[1] * pow(2, 4) + i)] = p_c_red[1][i]
 
         else:
-            for i in range(pow(2,4)):
+            for i in range(pow(2, 4)):
                 for j in range(2):
-                    self.p_c[j][self.last_c[0]*pow(2,5) + self.last_c[1]*pow(2,4) + i] = p_c_red[j][i]
-        for i in range(pow(2,3)):
-            self.p_s_pred[ self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[ 1] * pow(2, 3) + i] = p_s_pred_red[i]
+                    self.p_c[j][self.last_c[0] * pow(2, 5) + self.last_c[1] * pow(2, 4) + i] = p_c_red[j][i]
+        for i in range(pow(2, 3)):
+            self.p_s_pred[
+                self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[
+                    1] * pow(2, 3) + i] = p_s_pred_red[i]
+        #  me.IntegratedInformation(self.p_sca, self.p_s, self.p_s_pred, self.p_c)
         global world_diff
-        global world_entropy
-
-        for i in range(pow(2,9)):
-            p_s_pred_joint[i] = self.p_s_pred[i%pow(2,5) + pow(2,5)*(i//pow(2,7))]* self.p_sca[i//pow(2,3)]
-            p_s_pred_joint_old[i] = old_pred[i%pow(2,5) + pow(2,5)*(i//pow(2,7))]* self.p_sca[i//pow(2,3)]
-        world_entropy= 0 #entropy(p_s_pred_joint)
-        wdiff = 0
-        for i in range(pow(2,9)):
-            if old_pred[i%pow(2,5) + pow(2,5)*(i//pow(2,7))]*self.p_s_pred[i%pow(2,5) + pow(2,5)*(i//pow(2,7))] !=0:
-                wdiff = wdiff + p_s_pred_joint_old[i] * (log2(old_pred[i%pow(2,5) + pow(2,5)*(i//pow(2,7))]) - log2(self.p_s_pred[i%pow(2,5) + pow(2,5)*(i//pow(2,7))]))
-                world_entropy = world_entropy - p_s_pred_joint[i]  * log2(self.p_s_pred[i%pow(2,5) + pow(2,5)*(i//pow(2,7))])
-        world_diff = wdiff
-        return np.linalg.norm(old_pred-self.p_s_pred)
+        world_diff = np.linalg.norm(old_pred - self.p_s_pred)
+        return np.linalg.norm(old_pred - self.p_s_pred)
 
     # calculate the next step and update the sampled distributions
     def update(self, integratedinformation, inputValues):
@@ -456,13 +444,11 @@ if anim == True:
         ax1.plot(np.arange(n + 2)[k:], c[12][0:], color=colorGoal, label="Goal")
 
       #  ax2.plot(np.arange(n+2)[1:], c[0][1:], color = 'violet', label = "IntInf internal")
-        ax2.plot(np.arange(n + 2)[k:], c[0][0:], color=colorT, label = "IntInf")
-        ax4.plot(np.arange(n + 2)[k:], c[1][0:], color=ForestGreen, label = "MorphComp")
-        ax2.plot(np.arange(n + 2)[k:], c[9][0:], color=colorRe , label = "Synergistic")
-        ax3.plot(np.arange(n + 2)[k:], c[3][0:], color=colorRe , label = "SensInf")
-        ax4.plot(np.arange(n + 2)[k:], c[4][0:], color='black', label="MutualInf")
+        ax2.plot(np.arange(n + 2)[k:], c[0][0:], color=colorT, label = "Integrated Information")
+        ax4.plot(np.arange(n + 2)[k:], c[1][0:], color=ForestGreen, label = "Morphological Computation")
+        ax3.plot(np.arange(n + 2)[k:], c[3][0:], color=colorRe , label = "Sensory Information")
+        ax5.plot(np.arange(n + 2)[k:], c[4][0:], color='black', label="Total Information Flow")
         ax3.plot(np.arange(n + 2)[k:], c[5][0:], color=colorBlu, label="Command")
-        ax5.plot(np.arange(n + 2)[k:], c[13][0:], color=ForestGreen, label="WorldDiff")
 
         ax1.legend(loc="upper left")
         ax2.legend(loc="upper left")
