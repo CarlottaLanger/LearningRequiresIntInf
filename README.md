@@ -24,7 +24,8 @@ The code requires a python version 3 and it was tested on python 3.8 with the fo
 
 The program saves for every 100th step the measures in the file with the path given in line 67 of the main.py. 
 There we have in that order:
-0. Integrated Information,
+
+0. Integrated Information
 1. Morphological Computation
 2. Reactive Cotnrol
 3. Sensory Information
@@ -37,8 +38,12 @@ There we have in that order:
 10. Full Prediction
 11. Goal Prediciton
 12. Action Effect
-13. Success Rate and World Difference.
+13. Success Rate 
+14. World Difference.
 
 The animation displays the results for the Integrated Information, Morphological Computation, Action Effect, Sensory Information, Command and Total Information Flow, as depicted in the picture below. 
 
 ![Figure_1a](https://user-images.githubusercontent.com/21078779/227466420-36e0cc59-412c-421b-807f-dcb4578e8871.png)
+
+# Questions
+If there are questions or suggestions, don't hesitate to contact me at carlotta.langer@tuhh.de
