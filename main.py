@@ -20,6 +20,8 @@ sample = False
 global iteration
 global integratedinformation
 iteration = 0
+
+# define the environment
 arena = sg.box(-10,-10,10,10)
 hole = sg.box(-7,-7,-5,7)
 hole = hole.union(sg.box(-7,5,6,7))
@@ -49,19 +51,30 @@ warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 tau = 2*np.pi
 
-def rotate_origin(obj, theta):
-    return sa.rotate(obj,theta,use_radians=True,origin=(0,0))
 
+# set to False to deactivate the animation, increases the performance
 anim = True
 #0: no integrated information, 1: no integrated information in the beginning, 2: fully connected agents
-integratedinformation = 2
+integratedinformation = 0
+
+# set ideal to "True" if the agents should have access to the empirical world model. These enambles the PWM agents
+global ideal
+ideal = True
+
+# change the accuracy of the world model of the PWM agents with the learninglimit
+global learninglimit
+learninglimit = 20000
+
 sample = False
 global path
 
-#sensor length
-sens_length=1.25
+#sensor length and body size
+sens_length= 1.25
 bodySize = 0.55 #0.3
 
+
+def rotate_origin(obj, theta):
+    return sa.rotate(obj,theta,use_radians=True,origin=(0,0))
 
 
 path = 'results'+ str(integratedinformation)+'measures'+ str(sens_length).replace('.','')+'.py'
@@ -93,7 +106,7 @@ class AgentBody:
             x, y = np.random.random(2)*24-12
             self.pos = sg.Point(x, y)
             self.theta = np.random.random()*tau
-            if self.touchingWall(): # and sum(self.sensorValues(False))==0:
+            if self.touchingWall():
                 return self
     def touchingWall(self):
         return arena.contains(self.pos) and (self.pos.distance(walls) > bodySize )
@@ -125,12 +138,10 @@ class AgentBody:
         result[len(mySensors)] =  self.touchingWall()
         return result
     def update(self, controllerValues, dt=1.0):
-        #print(controllerValues)
         turnLeft, turnRight = controllerValues
         speed = (np.sum(controllerValues)+1)*0.2
         turning = 0.04*tau*(turnRight-turnLeft)
         self.theta += turning
-       # #print(self.pos)
         self.pos = sa.translate(self.pos,
             -speed*np.sin(self.theta)*dt,speed*np.cos(self.theta))
 
@@ -138,21 +149,15 @@ class AgentBody:
     def stick(self, controllerValues, dt=1.0):
         turnLeft, turnRight = controllerValues
         left, right, alive = self.sensorValues()
-       # #print("Left", left, right)
-        lr = left + right
-        counter = 0
         if left == 0 and right == 0:
             turning = 0.04 * tau * (turnRight - turnLeft)
             self.theta += turning
             speed = (np.sum(controllerValues) + 1) * 0.2
-            ##print(self.pos)
             self.pos = sa.translate(self.pos, -speed * np.sin(self.theta) * dt, speed * np.cos(self.theta))
-           # #print(self.pos)
         else:
             turning = 0.04 * tau * (turnRight - turnLeft)
             self.theta += turning
 
-lrate = 0.05
 
 class Controller:
     # Inner workings of the agent
@@ -174,7 +179,7 @@ class Controller:
             self.p_c = af.rand_cond_distr(2, n_hidden + n_inputs)
         if integratedinformation == 0:
             self.p_c_i = af.rand_cond_distr2(2, 1 + n_inputs)
-       # #print(self.p_s, np.sum(self.p_s))
+
 
     # em-algorithm to find the optimal policies and update the world model
     # here one could insert a different learning algorithm that updates the actuator, controller and prediction nodes
@@ -182,14 +187,21 @@ class Controller:
         #number of learning steps
         l_steps = 5
 
+        global ideal
         p_c_red = np.zeros((2, pow(2, 4)))
         p_s_pred_red = np.zeros(pow(2, 3))
-        old_pred = np.copy(self.p_s_pred)
+        p_s_red = np.zeros(pow(2,3))
 
-        for i in range(pow(2, 3)):
-            p_s_pred_red[i] = self.p_s_pred[
-                self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[
-                    1] * pow(2, 3) + i]
+        if(ideal == False):
+            for i in range(pow(2, 3)):
+                p_s_pred_red[i] = self.p_s_pred[
+                    self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[
+                        1] * pow(2, 3) + i]
+        else:
+            for i in range(pow(2,3)):
+                p_s_red[i] = self.p_s[int(
+                self.last_s[0] * pow(2, 7) + self.last_s[1] * pow(2, 6) + self.last_s[2] * pow(2, 5) + self.last_a[
+                    0] * pow(2, 4) + self.last_a[1] * pow(2, 3) + i)]
 
         if integratedinformation == 0:
             for i in range(pow(2, 3)):
@@ -201,18 +213,23 @@ class Controller:
                 for j in range(2):
                     p_c_red[j][i] = self.p_c[j][self.last_c[0] * pow(2, 5) + self.last_c[1] * pow(2, 4) + i]
 
-        for i in range(l_steps):
-            # policies
-            p1 = em.conditioning_pred_reduced(self.p_s_pred, p_c_red, self.p_a, p_s_pred_red)
-            p_c_red, self.p_a = em.factorizing_reduced(p1)
+        if(ideal ==False):
+            for i in range(l_steps):
+                # policies
+                p1 = em.conditioning_pred_reduced(self.p_s_pred, p_c_red, self.p_a, p_s_pred_red)
+                p_c_red, self.p_a = em.factorizing_reduced(p1)
 
-            # world model
-            p2 = em.conditioning_on_sensors_red(p_s_pred_red, p_c_red, self.p_a, self.p_s, self.p_s_pred)
-            self.p_s_pred = em.factorizing_sensors(p2)
-            for i in range(pow(2, 3)):
-                p_s_pred_red[i] = self.p_s_pred[
-                    self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[
-                        1] * pow(2, 3) + i]
+                # world model
+                p2 = em.conditioning_on_sensors_red(p_s_pred_red, p_c_red, self.p_a, self.p_s, self.p_s_pred)
+                self.p_s_pred = em.factorizing_sensors(p2)
+                for i in range(pow(2, 3)):
+                    p_s_pred_red[i] = self.p_s_pred[
+                        self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[
+                            1] * pow(2, 3) + i]
+        else:
+            for i in range(l_steps):
+                p1 = em.conditioning_pred_reduced_world(self.p_s, p_c_red, self.p_a, p_s_red)
+                p_c_red, self.p_a = em.factorizing_reduced(p1)
 
         if integratedinformation == 0:
             for i in range(pow(2, 3)):
@@ -223,14 +240,17 @@ class Controller:
             for i in range(pow(2, 4)):
                 for j in range(2):
                     self.p_c[j][self.last_c[0] * pow(2, 5) + self.last_c[1] * pow(2, 4) + i] = p_c_red[j][i]
-        for i in range(pow(2, 3)):
-            self.p_s_pred[
-                self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[
-                    1] * pow(2, 3) + i] = p_s_pred_red[i]
-        #  me.IntegratedInformation(self.p_sca, self.p_s, self.p_s_pred, self.p_c)
-        global world_diff
-        world_diff = np.linalg.norm(old_pred - self.p_s_pred)
-        return np.linalg.norm(old_pred - self.p_s_pred)
+        if(ideal == False):
+            for i in range(pow(2, 3)):
+                self.p_s_pred[
+                    self.last_c[0] * pow(2, 6) + self.last_c[1] * pow(2, 5) + self.last_a[0] * pow(2, 4) + self.last_a[
+                        1] * pow(2, 3) + i] = p_s_pred_red[i]
+        else:
+            for i in range(pow(2, 3)):
+                self.p_s[int(self.last_s[0] * pow(2, 7) + self.last_s[1] * pow(2, 6) + self.last_s[2] * pow(2, 5) +
+                                 self.last_a[0] * pow(2, 4) + self.last_a[1] * pow(2, 3) + i)] = p_s_red[i]
+
+        return self.p_s
 
     # calculate the next step and update the sampled distributions
     def update(self, integratedinformation, inputValues):
@@ -253,14 +273,29 @@ class Controller:
 
         index_sa = int(af.getIndex(self.last_s, self.last_a, []))
         self.n_sa[index_sa] = self.n_sa[index_sa] +1
-        for i in range(len(self.p_s)):
-            if int((i// (pow(2,len(inputValues))))) == index_sa:
-                if i == index_ssa:
-                    self.p_s[i] = ( (self.n_sa[index_sa])/(self.n_sa[index_sa] +1) )* self.p_s[i] + (1/(self.n_sa[index_sa] +1))
+        global ideal
+        if ideal:
+            global iteration
+            global learninglimit
+            if iteration < learninglimit:
+                for i in range(len(self.p_s)):
+                    if int((i // (pow(2, len(inputValues))))) == index_sa:
+                        if i == index_ssa:
+                            self.p_s[i] = ((self.n_sa[index_sa]) / (self.n_sa[index_sa] + 1)) * self.p_s[i] + (
+                                        1 / (self.n_sa[index_sa] + 1))
+                        else:
+                            self.p_s[i] = ((self.n_sa[index_sa]) / (self.n_sa[index_sa] + 1)) * self.p_s[i]
+                    else:
+                        self.p_s[i] = self.p_s[i]
+        else:
+            for i in range(len(self.p_s)):
+                if int((i// (pow(2,len(inputValues))))) == index_sa:
+                    if i == index_ssa:
+                        self.p_s[i] = ( (self.n_sa[index_sa])/(self.n_sa[index_sa] +1) )* self.p_s[i] + (1/(self.n_sa[index_sa] +1))
+                    else:
+                        self.p_s[i] = ((self.n_sa[index_sa]) / (self.n_sa[index_sa] + 1)) * self.p_s[i]
                 else:
-                    self.p_s[i] = ((self.n_sa[index_sa]) / (self.n_sa[index_sa] + 1)) * self.p_s[i]
-            else:
-                self.p_s[i] = self.p_s[i]
+                    self.p_s[i] = self.p_s[i]
 
         self.learn_policies(integratedinformation)
 
@@ -286,16 +321,15 @@ class Controller:
                     p_next_c[j][i] = self.p_c[j][index_sc[i]]
             c = np.random.choice([0,1],1,p=p_next_c[0]), np.random.choice([0,1],1,p=p_next_c[1])
 
-        #for the next a
+        #for the next actuator states
         p_next_a = np.zeros((len(self.p_a),2) )
         index_sc = np.array([int(af.getIndex(inputValues, c, [0])), int(af.getIndex(inputValues, c, [1]))])
         for j in range(len(self.p_a)):
             for i in range(2):
                 p_next_a[j][i] = self.p_a[j][index_sc[i]]
+        #here we need to add noise to avoid the probability of an actuator state being stuck at 0
         noise = np.random.normal(0, .1, p_next_a.shape)
-       # #print(p_next_a)
         p_next_a = np.abs(p_next_a + noise)
-        ##print(p_next_a)
         sumpa0 = np.sum(p_next_a[0])
         sumpa1 = np.sum(p_next_a[1])
         outputValues = np.random.choice([0,1],1,p=p_next_a[0]/sumpa0), np.random.choice([0,1],1,p=p_next_a[1]/sumpa1)
@@ -333,27 +367,20 @@ class Agent:
 
 
 
-def updateagents(t):
-    #print("t", t)
-   # plt.ion()
+def updateagents(t, output):
     global iteration
     iteration = iteration +1
     if anim==True:
         fig.show()
         fig.canvas.draw()
     global world
-   # #print(world)
     global path
-    output = open(path , 'a')
-    output.write('\n')
-    output.write('np.array([')
     n_agents = 1
-
+    output.write('np.array([')
     agents = [Agent(0).reset(0) for i in range(n_agents)]
     iters = 0
     c= [0,0,0, 0,0,0,0,0,0,0,0,0,0,0]
-    goal_var = False
-    while(iters < 20000): #((goal_var == False or iters < 1000) and (iters < 5000) ):
+    while(iters < 20000):
         if anim==True:
             ax.clear()
             plot_arena()
@@ -366,14 +393,11 @@ def updateagents(t):
                 else:
                    d = me.calc_meas(agent.controller.p_sca, agent.controller.p_s, agent.controller.p_s_pred, agent.controller.p_c, agent.controller.p_a)
                 d = np.append(d, agent.controller.goal[1])
-                global world_diff
-                d = np.append(d, world_diff)
                 d_write = ','.join(map(str, d))
                 output.write(d_write)
                 if agent == agents[0]:
                     for i in range(len(c)):
                         c[i] = np.append(c[i], d[i])
-                        #print(i, c[i], len(c), len(d))
                     if anim==True:
                         ax1.clear()
                         ax3.clear()
@@ -412,6 +436,10 @@ if anim == True:
     from descartes.patch import PolygonPatch
     plt.rcParams["figure.figsize"] = (12,8)
 
+    output = open(path , 'a+')
+    output.write('\n')
+    output.write('np.array([')
+    print("test1")
     fig = plt.figure()
     ax = fig.add_subplot(321)
     ax1 = fig.add_subplot(322)
@@ -437,41 +465,33 @@ if anim == True:
         x, y = ob.xy
         ax.plot(x, y, color=col, alpha=1, linewidth=1, solid_capstyle='round', zorder=2)
     def plotmeasures(c, n):
-        #ax3.plot(np.arange(0, pow(2, 6)), agent.controller.p_a[0], color="red")
-       # ax2.plot(np.arange(0, pow(2, 7)), agent.controller.p_s_pred, color="green")
         k = 0
-       # #print("n ",np.arange(n+2)[k:], c[7][1:])
-        ax1.plot(np.arange(n + 2)[k:], c[12][0:], color=colorGoal, label="Goal")
-
-      #  ax2.plot(np.arange(n+2)[1:], c[0][1:], color = 'violet', label = "IntInf internal")
+        ax1.plot(np.arange(n + 2)[k:], c[13][0:], color=colorGoal, label="Goal")
+        global ideal
         ax2.plot(np.arange(n + 2)[k:], c[0][0:], color=colorT, label = "Integrated Information")
         ax4.plot(np.arange(n + 2)[k:], c[1][0:], color=ForestGreen, label = "Morphological Computation")
+        ax4.plot(np.arange(n + 2)[k:], c[12][0:], color=colorRe, label = "Action Effect")
         ax3.plot(np.arange(n + 2)[k:], c[3][0:], color=colorRe , label = "Sensory Information")
         ax5.plot(np.arange(n + 2)[k:], c[4][0:], color='black', label="Total Information Flow")
         ax3.plot(np.arange(n + 2)[k:], c[5][0:], color=colorBlu, label="Command")
+        if not ideal:
+            ax3.plot(np.arange(n + 2)[k:], c[10][0:], color=ForestGreen, label="Full Prediction")
 
         ax1.legend(loc="upper left")
         ax2.legend(loc="upper left")
         ax3.legend(loc="upper left")
         ax4.legend(loc="upper left")
         ax5.legend(loc="upper left")
-    output = open(path, 'a')
-    #repeat = false
-    #for i in range(2):
-    ani = animation.FuncAnimation(fig, updateagents, repeat=False)
 
+    ani = animation.FuncAnimation(fig, updateagents, fargs=(output,))
     plt.show()
-    #main()
+    output.write('])')
 else:
     start_time = time.time()
    # writing the solutions to a file
     output = open(path, 'a')
-    output.write("import numpy as np")
-    output.write('\n')
-    output.write('meas = np.array([')
     for i in range(10):
         updateagents(1, output)
     output.write('])')
     output.close()
-    #print("--- %s seconds ---" % (time.time() - start_time))
 

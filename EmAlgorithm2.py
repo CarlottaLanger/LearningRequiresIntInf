@@ -57,6 +57,35 @@ def conditioning_pred_reduced(p_s_pred, p_c, p_a, p_s_pred_red):
         p_next[i//pow(2,3)] = p_next[i//pow(2,3)] + p_ext[i]
     return p_next
 
+#conditioning for the PWM agents
+def conditioning_pred_reduced_world(p_s, p_c, p_a, p_s_pred_red):
+    p_ext = np.zeros(pow(2,10))
+    p_next = np.zeros(pow(2, 7))
+    p_old = np.zeros(pow(2,10))
+    p_s_goal =np.array([0,1])
+    next_p = 0.0
+    for i in range(len(p_old)):
+        p_old[i] = p_s_pred_red[(i // pow(2, 7)) % pow(2, 3)] \
+            * p_c[0][(i // pow(2, 6)) % pow(2, 4)] * p_c[1][(i // pow(2, 5)) % 2 + 2 * ((i // pow(2, 7) % pow(2, 3)))] \
+            * p_a[0][((i//pow(2,3)) % 2) + 2 * ((i // pow(2,5)) % pow(2, 5))] * p_a[1][((i // pow(2,4)) % 2) + 2 * ((i // pow(2,5)) % pow(2, 5))] \
+            * p_s[i%pow(2,5) + pow(2,5)*(i//pow(2,7))]
+
+
+    next_p = np.array([0.0,0.0])
+    for i in range(len(p_old)):
+        next_p[i%2] = next_p[i%2] + p_old[i]
+
+    for i in range(len(p_old)):
+        if next_p[i % 2] > 0:
+            p_ext[i] = (p_old[i] / next_p[i % 2]) * p_s_goal[i % 2]
+        else:
+            # print("else")
+            p_ext[i] = (1 / 64) * p_s_goal[i % 2]
+    #print("extended", np.sum(p_ext), np.sum(p_old), np.sum(next_p), np.sum(p_s_goal))
+    for i in range(len(p_ext)):
+        p_next[i//pow(2,3)] = p_next[i//pow(2,3)] + p_ext[i]
+    #print("Pnext", np.sum(p_next), next_p, p_s_goal)
+    return p_next
 
 #world model
 def conditioning_on_sensors_red(p_s_pred_red,p_c_red, p_a,  p_s_goal, p_s_pred):
