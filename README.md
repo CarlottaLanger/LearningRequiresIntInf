@@ -1,5 +1,5 @@
 # Learning to Predict Requires Integrated Information
-This is the code and data corresponding to the article "Learning to Predict requires Integrated Information" (arXiv-preprint: https://arxiv.org/abs/2209.01418). 
+This is the code and data corresponding to the article "Outsourcing Control requires Control Complexity" (arXiv-preprint: https://arxiv.org/abs/2209.01418). 
 
 There we analyze the behavior of the Integrated Information measure, which can be seen as a measure for the complexity of the agent's controller, while the agents learn to predict and navigate their environment. This simple setup allows us to additionally calculate measures for every information flow among the agent's brain, body and environment, including a measure for Morphological Computation. The movement
 of the agents is demonstrated in the video below. If their body touches a wall they are stuck, as long as at least one of the sensors is still detecting a wall.
@@ -39,7 +39,6 @@ There we have in that order:
 11. Goal Prediciton
 12. Action Effect
 13. Success Rate 
-14. World Difference.
 
 The animation displays the results for the Integrated Information, Morphological Computation, Action Effect, Sensory Information, Command and Total Information Flow, as depicted in the picture below. 
 
