@@ -10,6 +10,7 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
 
     p_cn_c = np.zeros((2, pow(2,3)))
     p_sn_a = np.zeros(pow(2,5))
+    p_sn_a_noncond = np.zeros(pow(2, 5))
 
     p_full = np.zeros(pow(2,14))
     p_mutful = np.zeros(pow(2,14))
@@ -20,8 +21,10 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
     p_s_c_a_pred = np.zeros(pow(2,5))
     p_s_c_c_pred = np.zeros(pow(2,5))
     p_sa = np.zeros(pow(2,5))
-    p_ca = np.zeros(pow(2,5))
+    p_sc = np.zeros(pow(2,5))
+    p_ca = np.zeros(pow(2,4))
     p_s_s = np.zeros(pow(2,6))
+    p_s_s_noncond = np.zeros(pow(2,6))
     p_s_t = np.zeros(pow(2,3))
 
     p_at = np.zeros(pow(2,2))
@@ -31,8 +34,10 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
     p_a_n = np.zeros(pow(2,2))
     p_c_n = np.zeros(pow(2,2))
     p_s_n = np.zeros(pow(2,3))
+    p_s_n_pred = np.zeros(pow(2, 3))
     p_s_pred2 = np.zeros(pow(2,7))
     p_s_pred2_sgoal = np.zeros(pow(2,6))
+    p_s_sa = np.zeros(pow(2, 8))
 
 
     p_goal = [0.0,0.0]
@@ -54,8 +59,10 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
         p_s_pred2_sgoal[(i//2)%pow(2,6)] = p_s_pred2_sgoal[(i//2)%pow(2,6)] + p_full_predict[i]
         p_goal_pred[i%2] = p_goal_pred[i%2] + p_full_predict[i]
         p_full_predict2[i%pow(2,7)] = p_full_predict2[i%pow(2,7)]+ p_full_predict[i]
+        p_s_n_pred[i%pow(2,3)] = p_s_n_pred[i%pow(2,3)] + p_full_predict[i]
 
-
+    p_s_c_a_prednoncond = np.copy(p_s_c_a_pred)
+    p_s_c_c_prednoncond = np.copy(p_s_c_c_pred)
     p_marg_predict = np.copy(p_s_pred2)
 
     for i in range(pow(2,7)):
@@ -63,6 +70,7 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
         p_ct[(i//pow(2,2))%pow(2,2)] = p_ct[(i//pow(2,2))%pow(2,2)] + p_sca[i]
         p_sa[i%pow(2,2) + pow(2,2) * ((i//pow(2,4))%pow(2,3))] =  p_sa[i%pow(2,2) + pow(2,2) * ((i//pow(2,4))%pow(2,3))] + p_sca[i]
         p_ca[i%pow(2,4)] = p_ca[i%pow(2,4)] + p_sca[i]
+        p_sc[i // pow(2, 2)] = p_sc[i // pow(2, 2)] + p_sca[i]
     #distr on both var
     for i in range(pow(2,5)):
         p_s_c_a_pred[i] = p_s_c_a_pred[i]/ p_at[i//pow(2,3)]
@@ -80,8 +88,13 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
         p_sncj[1][(i//pow(2,4))%pow(2,3) + pow(2,3)*((i//pow(2,9))%2)] = p_sncj[1][(i//pow(2,4))%pow(2,3) + pow(2,3)*((i//pow(2,9))%2)] + p_full[i]
 
         p_sn_a[(i//pow(2,4))%pow(2,5)] = p_sn_a[(i//pow(2,4))%pow(2,5)] +p_full[i]
+        p_sn_a_noncond[(i // pow(2, 4)) % pow(2, 5)] = p_sn_a_noncond[(i // pow(2, 4)) % pow(2, 5)] + p_full[i]
         p_s_s[(i//pow(2,4))%pow(2,3) + pow(2,3)*(i//pow(2,11))] = p_s_s[(i//pow(2,4))%pow(2,3) + pow(2,3)*(i//pow(2,11))] + p_full[i]
+
+        p_s_s_noncond[(i // pow(2, 4)) % pow(2, 3) + pow(2, 3) * (i // pow(2, 11))] = p_s_s_noncond[(i // pow(2, 4)) % pow(2, 3) + pow(2, 3) * ( i // pow(2, 11))] + p_full[i]
         p_s_t[i//pow(2,11)] =  p_s_t[i//pow(2,11)] + p_full[i]
+
+        p_s_sa[(i//pow(2,4))%pow(2,5)+ pow(2,5)*(i//pow(2,11))] = p_s_sa[(i//pow(2,4))%pow(2,5)+ pow(2,5)*(i//pow(2,11))] + p_full[i]
 
         p_a_n[i%pow(2,2)] = p_a_n[i%pow(2,2)] +p_full[i]
         p_s_n[(i//pow(2,4))%pow(2,3)] = p_s_n[(i//pow(2,4))%pow(2,3)] + p_full[i]
@@ -133,7 +146,9 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
                 p_cn_c[j][i] = 0.5
    # ###print("t", np.sum(p_cn_c))
     int_int = 0.0
+    memory = 0.0
     morph = 0.0
+    morphfull = 0.0
     react = 0.0
     sensi = 0.0
     muti = 0.0
@@ -150,7 +165,7 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
         if p_s_pred[ i%pow(2,7)]* p_s_c_c_pred[i%pow(2,3) + pow(2,3)*((i//pow(2,5))%pow(2,2))] > 0:
             pred2 = pred2 + p_marg_predict[i] * (log2(p_s_pred2[ i] /p_s_c_c_pred[i%pow(2,3) + pow(2,3)*(i//pow(2,5))]))
         if p_s_pred2[i % pow(2, 7)] * p_s_n[i % pow(2, 3)] > 0:
-            predfull = predfull + p_marg_predict[i] * (log2(p_s_pred2[i]/p_s_n[i % pow(2, 3)]))
+            predfull = predfull + p_marg_predict[i] * (log2(p_s_pred2[i]/p_s_n_pred[i % pow(2, 3)]))
         if p_s_pred2[i % pow(2, 7)] * p_s_n[i % pow(2, 3)] > 0:
             predgoal = predgoal + p_marg_predict[i] * (log2(p_s_pred2[i]/(p_s_pred2_sgoal[(i//2)%pow(2,6)]* p_goal_pred[i%2])))
 
@@ -159,12 +174,13 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
         if (p_c[0][(i//pow(2,3))%pow(2,4) + pow(2,4)*((i//pow(2,9))%pow(2,2))]*p_c[1][(i//pow(2,2))%2 + 2*((i//pow(2,4))%pow(2,3) )+ pow(2,4)*((i//pow(2,9))%pow(2,2))]*p_cj_scj[0][(i // pow(2, 3)) % pow(2, 4) + pow(2, 4) * ((i // pow(2, 10)) % 2)]*  p_cj_scj[1][(i // pow(2, 2)) % 2 + 2 * ((i // pow(2, 4)) % pow(2, 3)) + pow(2, 4) * ((i // pow(2, 9)) % 2)]) >0 :
                 int_int = int_int + p_full[i]* (log2(p_c[0][(i//pow(2,3))%pow(2,4) + pow(2,4)*((i//pow(2,9))%pow(2,2))]*p_c[1][(i//pow(2,2))%2 + 2*((i//pow(2,4))%pow(2,3)) + pow(2,4)*((i//pow(2,9))%pow(2,2))]) -
                                                 log2(p_cj_scj[0][(i // pow(2, 3)) % pow(2, 4) + pow(2, 4) * ((i // pow(2, 10)) % 2)]*  p_cj_scj[1][(i // pow(2, 2)) % 2 + 2 * ((i // pow(2, 4)) % pow(2, 3)) + pow(2, 4) * ((i // pow(2, 9)) % 2)]))
-
+                memory = memory + p_full[i]*(log2(p_c[0][(i//pow(2,3))%pow(2,4) + pow(2,4)*((i//pow(2,9))%pow(2,2))]*p_c[1][(i//pow(2,2))%2 + 2*((i//pow(2,4))%pow(2,3)) + pow(2,4)*((i//pow(2,9))%pow(2,2))])- log2(p_c_n[(i//pow(2,2))%pow(2,2)]))
         if (p_c[0][(i // pow(2, 3)) % pow(2, 4) + pow(2, 4) * ((i // pow(2, 9)) % pow(2, 2))] * p_c[1][ (i // pow(2, 2)) % 2 + 2 * ((i // pow(2, 4)) % pow(2, 3)) + pow(2, 4) * ( (i // pow(2, 9)) % pow(2, 2))]*p_cn_c[0][(i//pow(2,3))%2 + 2*((i//pow(2,9))%pow(2,2))]*  p_cn_c[1][(i // pow(2, 2)) % 2 + 2 * ((i // pow(2, 9)) % pow(2, 2))]) > 0:
             sensi = sensi + p_full[i]*  (log2(p_c[0][(i//pow(2,3))%pow(2,4) + pow(2,4)*((i//pow(2,9))%pow(2,2))]*p_c[1][(i//pow(2,2))%2 + 2*((i//pow(2,4))%pow(2,3)) + pow(2,4)*((i//pow(2,9))%pow(2,2))]) -log2(p_cn_c[0][(i//pow(2,3))%2 + 2*((i//pow(2,9))%pow(2,2))]*  p_cn_c[1][(i // pow(2, 2)) % 2 + 2 * ((i // pow(2, 9)) % pow(2, 2))]))
 
-        if  p_s[(i//pow(2,4))%pow(2,5) + pow(2,5)*(i//pow(2,11))] > 0:
+        if  p_s[(i//pow(2,4))%pow(2,5) + pow(2,5)*(i//pow(2,11))]*p_sn_a[(i//pow(2,4))%pow(2,5)] > 0:
             morph = morph + p_full[i] * (log2(p_s[(i//pow(2,4))%pow(2,5) + pow(2,5)*(i//pow(2,11))])-log2(p_sn_a[(i//pow(2,4))%pow(2,5)] ) )
+            morphfull = morphfull + p_full[i] *(log2(p_s[(i//pow(2,4))%pow(2,5) + pow(2,5)*(i//pow(2,11))])-log2(p_s_n[(i//pow(2,4))%pow(2,3)] ) )
         if p_full[i]*p_mutful[i] > 0:
             muti = muti + p_full[i]*(log2(p_full[i])- log2(p_mutful[i]))
         if p_a[0][(i//2)%pow(2,6)]*p_a[1][i%2 + 2*((i//pow(2,2))%pow(2,5))]* p_an_c[0][(i//2)%pow(2,3)] *p_an_c[1][i%2 + 2*((i//pow(2,2))%pow(2,2))] >0:
@@ -180,6 +196,7 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
     p_it = np.zeros(pow(2, 7)) + (1 / pow(2, 7))
     diff = 1
     syn = 0.0
+    synmorph = 0.0
     #synergistic prediciton measure
     synergistic = False
     if synergistic == True:
@@ -191,32 +208,52 @@ def calc_meas(p_sca, p_s, p_s_pred, p_c, p_a):
             for j in range(pow(2, 7)):
                 p_it[j] = p_it[j] * (p_ca[(j // pow(2, 3))] / pit_ct_at[(j // pow(2, 3))])
             pit_s_a = np.zeros(pow(2, 5))
-            pit_a = np.zeros(pow(2, 2))
+            print(1, np.sum(p_it))
             for j in range(pow(2, 7)):
                 pit_s_a[j % pow(2, 5)] = pit_s_a[j % pow(2, 5)] + p_it[j]
-                pit_a[(j // pow(2, 3)) % pow(2, 2)] = pit_a[(j // pow(2, 3)) % pow(2, 2)] + p_it[j]
-            for j in range(pow(2, 5)):
-                pit_s_a[j] = pit_s_a[j] / pit_a[j // pow(2, 3)]
             for j in range(pow(2, 7)):
-                p_it[j] = p_it[j] * (p_s_c_a_pred[j % pow(2, 5)] / pit_s_a[j % pow(2, 5)])
-
+                p_it[j] = p_it[j] * (p_s_c_a_prednoncond[j % pow(2, 5)] / pit_s_a[j % pow(2, 5)])
+            print(2, np.sum(p_it))
             pit_s_c = np.zeros(pow(2, 5))
-            pit_c = np.zeros(pow(2, 2))
             for j in range(pow(2, 7)):
                 pit_s_c[j % pow(2, 3) + pow(2, 3) * ((j // pow(2, 5)) % pow(2, 2))] = pit_s_c[j % pow(2, 3) + pow(2, 3) * (
                             (j // pow(2, 5)) % pow(2, 2))] + p_it[j]
-                pit_c[((j // pow(2, 5)) % pow(2, 2))] = pit_c[((j // pow(2, 5)) % pow(2, 2))] + p_it[j]
-            for j in range(pow(2, 5)):
-                pit_s_c[j] = pit_s_c[j] / pit_c[j // pow(2, 3)]
             for j in range(pow(2, 7)):
-                if pit_s_c[j % pow(2, 3) + pow(2, 3) * ((j // pow(2, 5)) % pow(2, 2))] > 0:
-                    p_it[j] = p_it[j] * (p_s_c_c_pred[j % pow(2, 3) + pow(2, 3) * ((j // pow(2, 5)) % pow(2, 2))] / pit_s_c[
+                    p_it[j] = p_it[j] * (p_s_c_c_prednoncond[j % pow(2, 3) + pow(2, 3) * ((j // pow(2, 5)) % pow(2, 2))] / pit_s_c[
                         j % pow(2, 3) + pow(2, 3) * ((j // pow(2, 5)) % pow(2, 2))])
-                else:
-                    p_it[j] = p_it[j] * (1 / 8)
             diff = af.kl(oldp, p_it)
+            print(3, np.sum(p_it))
         syn = af.kl(p_full_predict2, p_it)
-    return int_int, morph, react, sensi, muti, comm, p_goal[1], pred1, pred2, syn,  predfull, predgoal, action
+    #synergistic Morphological
+    p_it = np.zeros(pow(2, 8)) + (1 / pow(2, 8))
+    diff = 1
+    synergisticmorph = True
+    if synergisticmorph == True:
+        while diff > 0.000001:
+            oldp = np.copy(p_it)
+            pit_st_st = np.zeros(pow(2, 6))
+            for j in range(pow(2, 8)):
+                pit_st_st[(j % pow(2, 3))+ (pow(2,3))*(j//pow(2,5))] = pit_st_st[(j % pow(2, 3))+ (pow(2,3))*(j//pow(2,5))] + p_it[j]
+            for j in range(pow(2, 8)):
+                p_it[j] = p_it[j] * (p_s_s_noncond[(j % pow(2, 3))+ (pow(2,3))*(j//pow(2,5))] / pit_st_st[(j % pow(2, 3))+ (pow(2,3))*(j//pow(2,5))])
+
+            pit_s_a = np.zeros(pow(2, 5))
+            for j in range(pow(2, 8)):
+                pit_s_a[j % pow(2, 5)] = pit_s_a[j % pow(2, 5)] + p_it[j]
+
+            for j in range(pow(2, 8)):
+                p_it[j] = p_it[j] * (p_sn_a_noncond[j % pow(2, 5)] / pit_s_a[j % pow(2, 5)])
+
+            pit_sa = np.zeros(pow(2, 5))
+
+            for j in range(pow(2, 8)):
+                pit_sa[j // pow(2, 3)] = pit_sa[j // pow(2, 3)] + p_it[j]
+            for j in range(pow(2, 8)):
+                    p_it[j] = p_it[j] * (p_sa[j //pow(2,3)] / pit_sa[j//pow(2,3)])
+            diff = af.kl(oldp, p_it)
+        synmorph = af.kl(p_s_sa, p_it)
+        print("syn", syn, pred1, pred2, predfull, "morph", synmorph, morph, action, morphfull, "int", int_int, memory)
+    return int_int, morph, react, sensi, muti, comm, p_goal[1], pred1, pred2, syn,  predfull, predgoal, action, synmorph, morphfull, memory
 
 def calc_meas_noint(p_sca, p_s, p_s_pred, p_c_i, p_a):
 
@@ -433,3 +470,39 @@ def calc_meas_noint(p_sca, p_s, p_s_pred, p_c_i, p_a):
             diff = af.kl(oldp, p_it)
         syn = af.kl(p_full_predict2, p_it)
     return int_int, morph, react, sensi, muti, comm, p_goal[1], pred1, pred2, syn, predfull, predgoal, action
+
+def calc_meas_morph(p_sca, p_s):
+    p_sa = np.zeros(pow(2,5))
+    for i in range(pow(2,7)):
+        p_sa[i%pow(2,2) + pow(2,2)*(i//pow(2,4))] =  p_sa[i%pow(2,2) + pow(2,2)*(i//pow(2,4))]  + p_sca[i]
+    print("test", np.sum(p_sa), np.sum(p_sca))
+    p_sn_a = np.zeros(pow(2,5))
+
+    p_full = np.zeros(pow(2,8))
+
+    p_at = np.zeros(pow(2,2))
+
+    for i in range(pow(2,8)):
+        p_full[i] = p_sa[i//pow(2,3)]*p_s[i]
+
+    for i in range(pow(2,5)):
+        p_at[i%pow(2,2)] = p_at[i%pow(2,2)] + p_sa[i]
+
+    #distr on both var
+    for i in range(pow(2,8)):
+        p_sn_a[i  % pow(2, 5)] = p_sn_a[i  % pow(2, 5)] + p_full[i]
+
+
+    for i in range(pow(2,5)):
+        if p_at[i//pow(2,3)] > 0:
+            p_sn_a[i] = p_sn_a[i] / p_at[i//pow(2,3)]
+        else:
+            p_sn_a[i] = 0.5
+
+    morph = 0.0
+    for i in range(pow(2,8)):
+         if  p_s[i] > 0:
+            morph = morph + p_full[i] * (log2(p_s[i])-log2(p_sn_a[(i)%pow(2,5)] ) )
+    print("Morph", morph, np.sum(p_full), np.sum(p_s), np.sum(p_sn_a))
+    return morph
+

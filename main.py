@@ -48,14 +48,14 @@ import warnings
 from shapely.errors import ShapelyDeprecationWarning
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 #np.random.seed(19680801)
-
+np.random.seed(80801)
 tau = 2*np.pi
 
 
 # set to False to deactivate the animation, increases the performance
 anim = True
 #0: no integrated information, 1: no integrated information in the beginning, 2: fully connected agents
-integratedinformation = 0
+integratedinformation = 2
 
 # set ideal to "True" if the agents should have access to the empirical world model. These enambles the PWM agents
 global ideal
@@ -77,7 +77,7 @@ def rotate_origin(obj, theta):
     return sa.rotate(obj,theta,use_radians=True,origin=(0,0))
 
 
-path = 'results'+ str(integratedinformation)+'measures'+ str(sens_length).replace('.','')+'.py'
+path = 'results'+ str(integratedinformation)+'measadures'+ str(sens_length).replace('.','')+'.py'
 global sensors
 sensors = [
     rotate_origin(sg.LineString([(0,bodySize),(0, bodySize+sens_length)]),-0.1*tau),
@@ -379,7 +379,7 @@ def updateagents(t, output):
     output.write('np.array([')
     agents = [Agent(0).reset(0) for i in range(n_agents)]
     iters = 0
-    c= [0,0,0, 0,0,0,0,0,0,0,0,0,0,0]
+    c= [0,0,0, 0,0,0,0,0,0,0,0,0,0,0, 0,0,0]
     while(iters < 20000):
         if anim==True:
             ax.clear()
@@ -392,7 +392,9 @@ def updateagents(t, output):
                    d = me.calc_meas_noint(agent.controller.p_sca, agent.controller.p_s, agent.controller.p_s_pred, agent.controller.p_c_i, agent.controller.p_a)
                 else:
                    d = me.calc_meas(agent.controller.p_sca, agent.controller.p_s, agent.controller.p_s_pred, agent.controller.p_c, agent.controller.p_a)
+                   #d1 = me.calc_meas_morph(agent.controller.p_sca, agent.controller.p_s)
                 d = np.append(d, agent.controller.goal[1])
+                print("goal", agent.controller.goal[1], d,)
                 d_write = ','.join(map(str, d))
                 output.write(d_write)
                 if agent == agents[0]:
@@ -412,7 +414,7 @@ def updateagents(t, output):
             fig.canvas.flush_events()
             fig.show()
     output.write("]),")
-    if iteration == 5:
+    if iteration == 10:
         exit(0)
     return 0
 
@@ -466,7 +468,7 @@ if anim == True:
         ax.plot(x, y, color=col, alpha=1, linewidth=1, solid_capstyle='round', zorder=2)
     def plotmeasures(c, n):
         k = 0
-        ax1.plot(np.arange(n + 2)[k:], c[13][0:], color=colorGoal, label="Goal")
+        ax1.plot(np.arange(n + 2)[k:], c[16][0:], color=colorGoal, label="Goal")
         global ideal
         ax2.plot(np.arange(n + 2)[k:], c[0][0:], color=colorT, label = "Integrated Information")
         ax4.plot(np.arange(n + 2)[k:], c[1][0:], color=ForestGreen, label = "Morphological Computation")
